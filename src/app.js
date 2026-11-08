@@ -1,10 +1,11 @@
-import { FILMS, TALENT, byTalentId, byFilmId, SEASON_WEEKS } from './data.js';
+import { FILMS, TALENT, byTalentId, byFilmId, SEASON_WEEKS, RELEASE_SNAPSHOT_DATE, SEASON_START } from './data.js';
 import { createGame, clone, money, studio, asset, owned, roleName, weekendFilmStats, filmRankings, projectedScore,
   projectedStudioGross, standings, weeklyProduction, SLOTS, SLOT_LABELS, effectiveAsk, bidStep, bidAvailable,
   placeBid, closeBidding, freeAgents, signFreeAgent, setLineup, autoCast, missingSlots, buyAdSupport,
   buyBadReview, offerCoProduction, tradeTalent, scoreWeekend, nextWeek, restart } from './engine.js';
 
-const KEY = 'hollywood-demo-v1';
+// Keep prior fictional-slate saves intact; actors/films now have different IDs.
+const KEY = 'hollywood-real-release-demo-2026-v1';
 const view = { page: 'overview', filter: 'all', search: '', toast: null };
 let game = load();
 const app = document.getElementById('app');
@@ -15,11 +16,11 @@ function amount(n, digits = 1) { return money(n, digits); }
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const roleLabels = { title: 'Title', lead: 'Lead actor', support: 'Supporting actor', director: 'Director' };
 const icons = {
-  overview: '01', market: '02', production: '03', boxoffice: '04', league: '05', rules: '06',
+  overview: '01', market: '02', production: '03', boxoffice: '04', league: '05', releases: '06', rules: '07',
 };
 const nav = [
   ['overview', 'This week'], ['market', 'Talent market'], ['production', 'Your film'],
-  ['boxoffice', 'Box office'], ['league', 'Standings'], ['rules', 'How to play'],
+  ['boxoffice', 'Box office'], ['league', 'Standings'], ['releases', 'Release calendar'], ['rules', 'How to play'],
 ];
 function mutation(cb) { try { const next = clone(game); cb(next); game = next; save(); toast('Saved.', 'success'); render(); } catch (error) { toast(error.message || 'That didn’t work. Try again.', 'error'); render(); } }
 function toast(message, kind = 'success') { view.toast = { message, kind }; }
@@ -27,6 +28,9 @@ function status() { return { bidding: 'Bidding is open', lineup: 'Time to cast y
 function primaryText() { return { bidding: 'Close bidding and cast', lineup: 'Lock lineup and see results', results: game.week === 8 ? 'See the winner' : 'Go to next week', finished: 'Season finished' }[game.phase]; }
 function phaseHelp() { return { bidding: 'Place your bids now. Once the auction closes, you can sign anyone left unclaimed.', lineup: 'Pick a title, a lead, two supporting actors and a director. All five spots have to be filled.', results: 'See what your film earned, then get ready for next weekend.', finished: 'Weeks 7 and 8 decided the winner. Check how everyone did.' }[game.phase]; }
 const premiereType = week => week >= 7 ? 'BLOCKBUSTER SEASON' : 'REGULAR SEASON';
+const showDate = (date) => new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const weekLabel = (week) => { const d = new Date(SEASON_START + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + (week-1)*7); return showDate(d.toISOString().slice(0,10)); };
+function sourceLink(f) { return `<a class="source-link" href="${esc(f.sourceUrl)}" target="_blank" rel="noopener noreferrer">Film source ↗</a>`; }
 function pill(text, kind = '') { return `<span class="pill ${kind}">${esc(text)}</span>`; }
 function filmVisual(f, compact = false) {
   return `<div class="poster ${compact ? 'poster-small' : ''}" style="--a:${f.colors[0]};--b:${f.colors[1]}"><span class="poster-texture"></span><span class="poster-mark">${String(f.week).padStart(2, '0')}</span><div class="poster-content"><span>${esc(f.genre)} / Week ${f.week}</span><strong>${esc(f.title)}</strong>${compact ? '' : `<small>${esc(f.tag)}</small>`}</div></div>`;
@@ -52,8 +56,8 @@ function layout(content) {
     <button class="reset-link" data-action="reset">↻ Reset demo season</button></div>
   </aside>
   <div class="main-shell"><header class="topbar"><div class="breadcrumbs"><span class="mobile-brand">Hollywood</span><span>Demo league</span><b>/</b><strong>${esc(nav.find(n => n[0] === view.page)?.[1] || 'This week')}</strong></div>
-    <div class="top-right"><span class="demo-tag">Fictional movies</span><span class="top-week">Week ${game.week} <i>of 8</i></span><span class="top-cash"><small>Cash</small>${amount(me.cash)}</span></div></header>
-    <div class="content-shell"><main class="main-content">${content}</main><aside class="right-rail">${rightRail()}</aside></div>
+    <div class="top-right"><span class="demo-tag">Real films / demo results</span><span class="top-week">Week ${game.week} <i>of 8</i></span><span class="top-cash"><small>Cash</small>${amount(me.cash)}</span></div></header>
+    <div class="content-shell"><main class="main-content"><div class="real-films-note"><strong>Real releases. Simulated numbers.</strong> Titles, premiere dates and credited people are real. All prices, scores and weekend grosses here are only for trying the game. <button data-nav="releases">See the release list →</button></div>${content}</main><aside class="right-rail">${rightRail()}</aside></div>
   </div>
   <nav class="bottom-nav">${nav.slice(0,5).map(([id,label])=> `<button data-nav="${id}" class="${view.page===id?'selected':''}"><span>${icons[id]}</span><small>${id === 'production' ? 'Cast' : id === 'boxoffice' ? 'Scores' : id === 'overview' ? 'Home' : id === 'market' ? 'Market' : 'League'}</small></button>`).join('')}</nav>
   ${view.toast ? `<div class="toast ${view.toast.kind}" role="status"><span>${view.toast.kind === 'error' ? '!' : '✓'}</span>${esc(view.toast.message)}<button data-action="dismiss-toast" aria-label="Dismiss notice">×</button></div>` : ''}
@@ -67,10 +71,10 @@ function rightRail() {
   <div class="rail-section"><div class="rail-heading">The standings <button data-nav="league">See all →</button></div>
     ${leaders.map((s,i)=> `<div class="rail-standing"><span class="standing-index">0${i+1}</span><span class="standing-avatar" style="--studio-color:${s.color}">${s.initials}</span><div><strong>${esc(s.name)}</strong><small>${game.week >= 7 && game.history.some(h => h.week>=7) ? 'Blockbuster profit' : 'Studio cash'}</small></div><b>${amount(game.week >= 7 && game.history.some(h => h.week>=7) ? s.blockbusterProfit : s.cash)}</b></div>`).join('')}
   </div>
-  <div class="rail-section"><div class="rail-heading">Coming to theaters <span>Next up</span></div>
-    ${upcoming.length ? upcoming.map(f=>`<div class="premiere-rail">${filmVisual(f,true)}<div><small>WEEK ${String(f.week).padStart(2,'0')} · ${esc(f.genre)}</small><strong>${esc(f.title)}</strong><span>Budget ${amount(f.budget,0)}</span></div></div>`).join('') : '<p class="small-muted">All releases are now in theaters.</p>'}
+  <div class="rail-section"><div class="rail-heading">Coming to theaters <button data-nav="releases">All releases →</button></div>
+    ${upcoming.length ? upcoming.map(f=>`<div class="premiere-rail">${filmVisual(f,true)}<div><small>WEEK ${String(f.week).padStart(2,'0')} · ${esc(f.genre)}</small><strong>${esc(f.title)}</strong><span>${showDate(f.releaseDate)} · ${esc(f.lead)}</span></div></div>`).join('') : '<p class="small-muted">All releases are now in theaters.</p>'}
   </div>
-  <div class="rail-footer"><small>A fantasy game, not a live box-office feed.</small></div>`;
+  <div class="rail-footer"><small>Release information checked ${esc(RELEASE_SNAPSHOT_DATE)}. Box-office scores are illustrative.</small></div>`;
 }
 function sectionIntro(eyebrow, title, description, action = '') { return `<div class="section-intro"><div><span class="eyebrow">${eyebrow}</span><h1>${title}</h1><p>${description}</p></div>${action}</div>`; }
 function miniStudioStanding() {
@@ -90,10 +94,10 @@ function renderOverview() {
   const heroQuestion = game.phase === 'finished' ? 'How did you do?' : game.phase === 'results' ? 'Was it worth it?' : game.phase === 'lineup' ? 'Now make a film.' : game.week === 1 ? "Who's worth it?" : 'Who gets your money?';
   const heroDescription = game.phase === 'finished' ? 'Eight weekends later, the final numbers are in. See who made the most profit in the finals.' : game.phase === 'results' ? 'See what everyone earned before you turn to the next release weekend.' : game.phase === 'lineup' ? 'The auction is over. Cast your five slots, make your deals and see what the weekend brings.' : 'Buy the movies and talent you believe in. Put together a new film each week, then find out if your picks pay off.';
   return `<section class="hero"><div class="hero-watermark" aria-hidden="true">${String(game.week).padStart(2,'0')}</div><div class="hero-content"><div class="hero-tags">${pill('Hollywood / Season 1','outlined')} ${pill(isBlockbuster?'The finals':'Regular season', isBlockbuster ? 'highlight' : '')}</div>
-    <div class="hero-number">Week ${String(game.week).padStart(2,'0')} <span>of 08</span></div><h1>${heroLine}<br/><em>${heroQuestion}</em></h1><p>${heroDescription}</p><div class="hero-actions">${primaryAction()}<button class="btn btn-outline" data-nav="rules">How it works →</button></div></div>
+    <div class="hero-number">Week ${String(game.week).padStart(2,'0')} <span>of 08</span></div><h1>${heroLine}<br/><em>${heroQuestion}</em></h1><p>${heroDescription}</p><div class="hero-actions">${primaryAction()}<button class="btn btn-outline" data-nav="releases">Real releases →</button></div></div>
     </section>
     <div class="notice-strip"><span class="notice-light"></span><div><strong>${status()}</strong><small>${phaseHelp()}</small></div><span>0${game.week} / 08</span></div>
-    <div class="stats-grid">${metric('Cash to spend',amount(me.cash),'01', 'Your studio balance')}${metric('Talent owned',String(owned(game,'you').length).padStart(2,'0'),'02',`${amount(portfolio)} spent on talent`)}${metric('This week’s gross',amount(projected),'03',game.phase==='lineup'?'Before marketing and bonuses':game.phase==='results'?'Weekend results':'Pick a lineup to see an estimate')}${metric('Finals profit',amount(me.blockbusterProfit),'04','Only weeks 7 and 8 count','gold-text')}</div>
+    <div class="stats-grid">${metric('Cash to spend',amount(me.cash),'01', 'Your studio balance')}${metric('Talent owned',String(owned(game,'you').length).padStart(2,'0'),'02',`${amount(portfolio)} spent on talent`)}${metric('This week’s gross',amount(projected),'03',game.phase==='lineup'?'Before marketing and bonuses':game.phase==='results'?'Weekend results':'Pick a lineup to see a demo estimate')}${metric('Finals profit',amount(me.blockbusterProfit),'04','Only weeks 7 and 8 count','gold-text')}</div>
     <div class="dashboard-grid"><div class="dashboard-main">${lineupPanel(true)}${latest ? resultTeaser(latest) : marketTeaser()}</div><div class="dashboard-side">${miniStudioStanding()}${activityPanel()}</div></div>`;
 }
 function lineupPanel(compact) {
@@ -111,7 +115,7 @@ function resultTeaser(result) {
 function marketTeaser() {
   const movies = FILMS.filter(f=>f.week===game.week).slice(0,2);
   return `<div class="panel"><div class="panel-heading"><div><span class="eyebrow">This week's releases</span><h2>Opening this weekend</h2></div><button class="text-link" data-nav="market">See the market →</button></div>
-   <div class="feature-film-grid">${movies.map(f=>`<div class="feature-film">${filmVisual(f)}<div class="feature-film-details"><span>${esc(f.genre)} · ${amount(f.budget,0)} BUDGET</span><strong>${esc(f.title)}</strong></div></div>`).join('')}</div></div>`;
+   <div class="feature-film-grid">${movies.map(f=>`<div class="feature-film">${filmVisual(f)}<div class="feature-film-details"><span>${esc(f.genre)} · ${showDate(f.releaseDate)}</span><strong>${esc(f.title)}</strong><div class="film-source-small">${sourceLink(f)}</div></div></div>`).join('')}</div></div>`;
 }
 function activityPanel() {
   const events = game.journal.slice(0,5);
@@ -122,8 +126,8 @@ function renderMarket() {
   const signing = game.phase==='lineup';
   const lots = bidding ? game.auctions.map(a=>({talent:byTalentId[a.talentId],a})) : signing ? freeAgents(game).map(t=>({talent:t})) : [];
   const categories=['all','title','lead','support','director'];
-  return `${sectionIntro('The talent market', 'Who’s available?', bidding?'Bid on the movies, actors and directors you want. You start with $50 million, but the other producers are shopping too.':signing?'Bidding is closed. You can still sign anyone who went unsold.':'The market opens again when the next week begins.', game.phase==='bidding'||game.phase==='lineup'?primaryAction():'')}
-    <div class="notice-strip light"><span class="notice-light"></span><div><strong>${bidding?'Bidding now':signing?'Unsold talent':'Market closed'}</strong><small>${bidding?'Opening prices follow the budget-based rules. Check who has the high bid before you spend.':signing?'You can sign unsold talent at the listed price.':'You can still see who owns what below.'}</small></div><span>${lots.length} LOTS</span></div>
+  return `${sectionIntro('The talent market', 'Who’s available?', bidding?'Bid on the movies, actors and directors you want. You have competition from three other producers.':signing?'Bidding is closed. You can still sign anyone who went unsold.':'The market opens again when the next week begins.', game.phase==='bidding'||game.phase==='lineup'?primaryAction():'')}
+    <div class="notice-strip light"><span class="notice-light"></span><div><strong>${bidding?'Bidding now':signing?'Unsold talent':'Market closed'}</strong><small>${bidding?'Prices are simulated until actual production budgets and historical grosses are available. Check the high bid before you spend.':signing?'You can sign unsold talent at the listed price.':'You can still see who owns what below.'}</small></div><span>${lots.length} LOTS</span></div>
     <div class="market-tools"><div class="filters">${categories.map(c=>`<button class="filter-btn ${view.filter===c?'selected':''}" data-filter="${c}">${c==='all'?'All talent':roleLabels[c]}</button>`).join('')}</div><label class="search-box"><span>⌕</span><input id="search-talent" placeholder="Search talent or movies..." type="search" value="${esc(view.search)}" /></label></div>
     ${lots.length?`<div class="market-list">${lots.filter(({talent:t})=> view.filter==='all'||t.primaryRole===view.filter).filter(({talent:t})=>!view.search||`${t.name} ${t.roles.map(r=>byFilmId[r.filmId].title).join(' ')}`.toLowerCase().includes(view.search.toLowerCase())).sort((a,b)=>a.talent.firstWeek-b.talent.firstWeek||a.talent.reserve-b.talent.reserve).map(({talent:t,a})=>talentRow(t,a)).join('')}</div>`:empty('No open lots this phase.','You can still see the studio holdings and rulebook.')}
     ${signing?'<p class="disclaimer-inline">You can sign free agents until you lock your lineup. After that, you can only move talent through a trade.</p>':''}
@@ -193,13 +197,13 @@ function renderBoxOffice() {
   const shown=recent?.week||game.week;
   const ranked=recent?.rankings || [];
   return `${sectionIntro('The weekend report', 'Here’s what happened.', 'Your box office gross earns cash during the regular season. In weeks 7 and 8, only film profit decides the winner.',game.phase==='results'?primaryAction():'')}
-    <div class="notice-strip light"><span class="notice-light"></span><div><strong>${recent?`Week ${shown} sample results`:'No results yet'}</strong><small>${recent?'The fictional demo results are posted below.':'No week has been scored yet. Finish your auction and lock your cast to see results.'}</small></div><span>DOMESTIC</span></div>
+    <div class="notice-strip light"><span class="notice-light"></span><div><strong>${recent?`Week ${shown} sample results`:'No results yet'}</strong><small>${recent?'The results below are simulated, not actual box-office figures.':'No week has been scored yet. Finish your auction and lock your cast to see results.'}</small></div><span>DOMESTIC</span></div>
     ${recent?`<div class="result-banner"><span>YOUR STUDIO · WEEK ${String(recent.week).padStart(2,'0')}</span><div><strong>${amount(recent.cards.find(c=>c.studioId==='you').finalGross)}</strong><small>WEEKEND GROSS</small></div><div><strong>${amount(recent.cards.find(c=>c.studioId==='you').profit)}</strong><small>FILM PROFIT</small></div></div>
     <div class="panel"><div class="panel-heading"><div><span class="eyebrow">The other producers</span><h2>Weekend studio scores</h2></div>${pill(recent.week>=7?'Profit decides':'Gross decides','soft-gold')}</div>
     <div class="table-scroller"><table class="data-table"><thead><tr><th>PRODUCER</th><th>FILM GROSS</th><th>BUDGET</th><th>PROFIT</th><th>BONUSES</th></tr></thead><tbody>${[...recent.cards].sort((a,b)=>recent.week>=7?b.profit-a.profit:b.finalGross-a.finalGross).map((c,i)=>`<tr class="${c.studioId==='you'?'you-row':''}"><td><span class="rank-cell">0${i+1}</span><strong>${esc(studio(game,c.studioId).name)}</strong></td><td>${amount(c.finalGross)}</td><td>${amount(c.budget)}</td><td class="${c.profit>=0?'positive':'negative'}">${amount(c.profit)}</td><td>${amount(c.bonus)}</td></tr>`).join('')}</tbody></table></div></div>`:empty('No results yet','Start by bidding on talent in the market, then cast your production.')}
-    ${recent?`<div class="panel"><div class="panel-heading"><div><span class="eyebrow">Movie results</span><h2>Domestic weekend box office</h2></div>${pill('Sample figures','outlined')}</div>
-    <div class="table-scroller"><table class="data-table movie-table"><thead><tr><th>RANK</th><th>TITLE</th><th>WEEKEND</th><th>THEATERS</th><th>PER SCREEN</th><th>CRITICS</th></tr></thead><tbody>${ranked.map(m=>{const f=byFilmId[m.filmId];return `<tr><td><span class="rank-cell">${String(m.rank).padStart(2,'0')}</span></td><td><strong>${esc(f.title)}</strong><small>${esc(f.genre)} · W${String(f.week).padStart(2,'0')} debut</small></td><td>${amount(m.gross)}</td><td>${Number(m.screens).toLocaleString()}</td><td>$${Math.round(m.gross*1000000/m.screens).toLocaleString()}</td><td>${f.rt}%</td></tr>`;}).join('')}</tbody></table></div></div>`:''}
-    <p class="disclaimer-inline">All films, grosses, budgets, theater counts, critic scores, cast, and director credits are fictional fixtures. These results are not real domestic box-office figures.</p>`;
+    ${recent?`<div class="panel"><div class="panel-heading"><div><span class="eyebrow">Movie results</span><h2>Simulated weekend box office</h2></div>${pill('Game figures only','outlined')}</div>
+    <div class="table-scroller"><table class="data-table movie-table"><thead><tr><th>RANK</th><th>TITLE</th><th>WEEKEND</th><th>THEATERS</th><th>PER SCREEN</th><th>DEMO CRITIC SCORE</th></tr></thead><tbody>${ranked.map(m=>{const f=byFilmId[m.filmId];return `<tr><td><span class="rank-cell">${String(m.rank).padStart(2,'0')}</span></td><td><strong>${esc(f.title)}</strong><small>${esc(f.genre)} · W${String(f.week).padStart(2,'0')} debut</small></td><td>${amount(m.gross)}</td><td>${Number(m.screens).toLocaleString()}</td><td>$${Math.round(m.gross*1000000/m.screens).toLocaleString()}</td><td>${f.rt}%</td></tr>`;}).join('')}</tbody></table></div></div>`:''}
+    <p class="disclaimer-inline">The movie titles, theatrical dates and cast and director credits are real; their assigned fantasy roles are gameplay choices. All grosses, budgets, theater counts, review scores and studio results are simulated. Nothing on this page is an actual box-office result.</p>`;
 }
 function renderLeague() {
   const ranking=standings(game);
@@ -211,6 +215,15 @@ function renderLeague() {
    <div class="panel"><div class="panel-heading"><div><span class="eyebrow">Week by week</span><h2>Season results</h2></div></div>
    ${game.history.length?`<div class="table-scroller"><table class="data-table"><thead><tr><th>WEEK</th>${game.studios.map(s=>`<th>${esc(s.name)}</th>`).join('')}</tr></thead><tbody>${game.history.map(h=>`<tr><td><strong>${h.week>=7?'★ ':''}W${String(h.week).padStart(2,'0')}</strong></td>${game.studios.map(s=>{const c=h.cards.find(c=>c.studioId===s.id);return `<td>${amount(h.week>=7?c.profit:c.finalGross)}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div>`:empty('No results yet.','Score the first weekend to see how everyone did.')}</div>
    <p class="disclaimer-inline">Regular-season rankings show studio cash. In weeks 7 and 8, the champion is the studio with the highest combined film profit (adjusted gross minus the declining production budget).</p>`;
+}
+function renderReleases() {
+  const groups = [...new Set(FILMS.map(f=>f.week))];
+  return `${sectionIntro('2026 holiday slate', 'The real releases.', 'Here are the movies in this eight-week game, with opening dates and credited people. This list is a reviewed snapshot, not a live industry data feed.')}
+    <div class="notice-strip light"><span class="notice-light"></span><div><strong>${FILMS.length} real theatrical releases</strong><small>United States / Canada. Last checked ${esc(RELEASE_SNAPSHOT_DATE)}. Release dates can change.</small></div><span>8 WEEKS</span></div>
+    <div class="releases-legend">These movie details are sourced. Their <strong>fantasy roles</strong> are our game choices. The prices and financial results elsewhere on the site are simulated.</div>
+    ${groups.map(week=>`<section class="release-week"><div class="release-week-heading"><span>WEEK ${String(week).padStart(2,'0')}</span><h2>${weekLabel(week)} weekend</h2></div>
+      <div class="release-grid">${FILMS.filter(f=>f.week===week).map(f=>`<article class="release-card">${filmVisual(f,true)}<div class="release-card-body"><div class="release-date">${showDate(f.releaseDate)} · ${esc(f.genre)}</div><h3>${esc(f.title)}</h3><dl><dt>Featured lead</dt><dd>${esc(f.lead)}</dd><dt>Supporting cast</dt><dd>${esc(f.supporting.join(', '))}</dd><dt>Director${f.directors?.length > 1?'s':''}</dt><dd>${esc(f.directors?.join(' and ') || f.director)}</dd></dl>${f.releaseNote?`<p class="release-note">${esc(f.releaseNote)}</p>`:''}${sourceLink(f)}</div></article>`).join('')}</div></section>`).join('')}
+    <p class="disclaimer-inline">Sources: credited studio, distributor and cinema listings linked with each film. Release dates and billing can change. No image posters, actual box-office numbers or critic reviews are imported.</p>`;
 }
 function ruleCard(icon,title,formula,detail) { return `<div class="rule-card"><span class="rule-icon">${icon}</span><h3>${title}</h3><strong>${formula}</strong><p>${detail}</p></div>`; }
 function renderRules() {
@@ -232,17 +245,17 @@ function renderRules() {
     ${ruleCard('⌛','Declining budgets','50% less each week','For the blockbuster profit calculation, a purchased talent’s budget halves every week after each movie opens and reaches zero five weeks after opening.')}
     ${ruleCard('♛','The championship','Weeks 7–8 total profit','Blockbuster season decides the champion. Add your profits from weeks seven and eight; highest total wins. Cash serves as the tiebreaker.')}
    </div>
-   <div class="panel data-disclosure"><span class="eyebrow">About this demo</span><h2>The rules are real. The movies aren’t.</h2><p>This version is a single-browser demo against three computer-controlled producer studios. The film catalog and financial outcomes are invented for testing. Game data saves on this device. No real account, shared league, public auctions, or real box-office feed is connected yet.</p><p>Before launching a real-money-data version, the production site needs a licensed weekend domestic box-office feed, confirmed credits and budget data, rights to use critic scores, a central database, and authenticated multiplayer auctions. This demo never scrapes movie websites.</p><div class="rule-actions"><button class="btn btn-dark" data-nav="overview">Back to this week →</button><button class="btn btn-outline" data-action="reset">Reset demo season</button></div></div>`;
+   <div class="panel data-disclosure"><span class="eyebrow">About this demo</span><h2>Real movies. Demo economics.</h2><p>The November 6 to December 25, 2026 release slate features real movies and credited actors and directors. Dates and credits are a reviewed snapshot, not a continuous official feed. The lead/support roles are game assignments, and jointly credited directors are one directing asset. See the release calendar for film sources.</p><p>All budgets, prior-actor performance, opening bids, critic scores, grosses and theater counts are simulated so you can play through a season. They are not reported industry figures or Rotten Tomatoes ratings. This is a local demo against three computer-controlled studios. For actual scoring we still need an authorized weekend domestic box-office feed, production budget and critic-rating data, and shared league accounts.</p><div class="rule-actions"><button class="btn btn-dark" data-nav="overview">Back to this week →</button><button class="btn btn-outline" data-action="reset">Reset demo season</button></div></div>`;
 }
 function render() {
-  const body = ({overview:renderOverview,market:renderMarket,production:renderProduction,boxoffice:renderBoxOffice,league:renderLeague,rules:renderRules}[view.page] || renderOverview)();
+  const body = ({overview:renderOverview,market:renderMarket,production:renderProduction,boxoffice:renderBoxOffice,league:renderLeague,releases:renderReleases,rules:renderRules}[view.page] || renderOverview)();
   app.innerHTML = layout(body);
   document.title=`Hollywood · ${nav.find(n=>n[0]===view.page)?.[1] || 'This week'}`;
 }
 function getInput(id) { return document.getElementById(id)?.value; }
 function routeAction(action, node) {
   if (action==='dismiss-toast') { view.toast=null; render(); return; }
-  if (action==='reset') { if (window.confirm('Reset the entire fictional league and start over? This erases your local demo progress.')) { mutation(g=>restart(g)); view.page='overview'; } return; }
+  if (action==='reset') { if (window.confirm('Reset this demo season? This clears your current progress. Your old fictional-slate save is kept separately.')) { mutation(g=>restart(g)); view.page='overview'; } return; }
   if (action==='primary') {
     if (game.phase==='bidding') mutation(closeBidding);
     else if (game.phase==='lineup') { mutation(scoreWeekend); if(game.phase==='results') { view.page='boxoffice'; render(); } }

@@ -11,7 +11,7 @@ Hollywood should read like a good movie fan explaining the game to a friend, not
 - Describe consequences. Example: "Place your bids now. Once the auction closes, you can sign anyone left unclaimed."
 - Name the actual rule when it matters: one title, one lead, two supporting actors and a director; weeks seven and eight are about profit.
 - Avoid vague hype like "conquer the box office," "build your empire," or "make millions." Avoid unnecessary em dashes.
-- Be honest about the demo. The films, figures and competing studios are fictional; the game runs locally in one browser.
+- Be clear about provenance. The films and credited people are real (dated, linked snapshot); all financial figures, scores, film rankings and competing studios are simulated, and the game runs locally in one browser.
 - Change language with state. After the first auction, don't pretend the player still has the original $50 million.
 
 ## Visual character
@@ -21,6 +21,6 @@ Hollywood should read like a good movie fan explaining the game to a friend, not
 - Simple boxes, visible borders and clear hierarchy instead of glowing cards, gradient-heavy panels, generic badges and decorative sparkles.
 - Typography and game data should do the work. Fictional poster artwork can be graphic and typographic without pretending to be real movie marketing.
 - Every control should stay readable and usable on mobile. The fixed mobile navigation has five direct routes; the rules and reset are reachable through the UI.
-- Keep sample-data disclosure visible on every screen.
+- Keep the separation between real movie data and simulated scoring visible on every screen.
 
 This is a project-level implementation summary inspired by the owner's writing preferences, not a replacement for their original personal writing guide.
