@@ -46,6 +46,10 @@ Winning prices are actual talent cost bases. A production's current budget is th
 
 The eight-week sample cannot reach a 10-week milestone. The 10-week rule is implemented in the scorer, but realizing that bonus needs future seasons to support carryover of eligible prior-season films/talent.
 
+## Design and copy
+
+The interface uses a restrained, editorial look inspired by weekend movie trade coverage: warm paper, readable type, simple borders, and more direct wording. UI copy follows the principles in [`docs/VOICE_AND_DESIGN.md`](docs/VOICE_AND_DESIGN.md). The game rules and fictional-data disclosures remain unchanged.
+
 ## Source layout
 
 - `index.html`, `styles.css`, `favicon.svg`: static application shell and visual design.
