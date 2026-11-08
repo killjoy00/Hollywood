@@ -1,0 +1,13 @@
+{
+  "name": "hollywood-fantasy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hollywood — a fantasy movie box-office league (playable demo)",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test",
+    "check": "node --check src/data.js && node --check src/engine.js && node --check src/app.js && npm test"
+  },
+  "engines": { "node": ">=20" }
+}
