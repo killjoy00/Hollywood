@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FILMS, TALENT, byTalentId, byFilmId, LEAD_HISTORY } from '../src/data.js';
+import { FILMS, TALENT, byTalentId, byFilmId, RELEASE_SNAPSHOT_DATE, SEASON_START } from '../src/data.js';
 import { createGame, placeBid, closeBidding, freeAgents, signFreeAgent, setLineup, autoCast,
   missingSlots, scoreTalent, scoreWeekend, nextWeek, asset, owned, budgetForAsset, filmRankings,
   effectiveAsk, bidAvailable, buyAdSupport, buyBadReview, offerCoProduction, tradeTalent,
@@ -31,25 +31,43 @@ test('fixture market starts with 4 studios, 50M cash, opening-week and following
 });
 
 test('title / lead / support / director formulas follow the supplied rules', () => {
-  const eclipse=byFilmId.eclipse;
-  const title=byTalentId['title-eclipse'];
-  const lead=byTalentId['p-mara-voss'];
-  const support=byTalentId['p-theo-grant'];
-  const director=byTalentId['p-leah-monroe'];
-  approximate(scoreTalent(title,1),31);
-  approximate(scoreTalent(lead,1),31*.75);
-  approximate(scoreTalent(support,1),31*.4*.81);
-  approximate(scoreTalent(director,1),31*1000/3650);
-  assert.ok(lead.roles.some(r=>r.filmId==='summer'&&r.role==='support'));
+  const cat = byFilmId.cat;
+  const title = byTalentId['title-cat'];
+  const lead = byTalentId['p-bill-hader'];
+  const support = byTalentId['p-matt-berry'];
+  const director = byTalentId['p-erica-rivinoja-alessandro-carloni'];
+  assert.equal(cat.title, 'The Cat in the Hat');
+  approximate(scoreTalent(title,1),cat.gross[0]);
+  approximate(scoreTalent(lead,1),cat.gross[0]*.75);
+  approximate(scoreTalent(support,1),cat.gross[0]*.4*cat.rt/100);
+  approximate(scoreTalent(director,1),cat.gross[0]*1000/cat.screens[0]);
   assert.equal(lead.primaryRole,'lead');
-  assert.ok(lead.reserve>lead.roles[0].reserve);
   assert.ok(TALENT.every(t=>t.reserve>=.5));
 });
 
-test('one asset scores across all applicable films and pays all role opening fees',()=>{
-  const t=byTalentId['p-mara-voss'];
-  approximate(scoreTalent(t,3),8.8*.75+15.2*.4*.88);
+test('one actor scores across a lead and supporting role in real films', () => {
+  const t=byTalentId['p-pedro-pascal'];
+  const behemoth=byFilmId.behemoth;
+  const avengers=byFilmId.avengers;
+  assert.ok(t.roles.some(r=>r.filmId==='behemoth'&&r.role==='lead'));
+  assert.ok(t.roles.some(r=>r.filmId==='avengers'&&r.role==='support'));
+  assert.equal(t.primaryRole,'lead');
+  approximate(scoreTalent(t,7),behemoth.gross[2]*.75+avengers.gross[0]*.4*(avengers.rt/100));
   approximate(t.reserve,t.roles.reduce((n,r)=>n+r.reserve,0));
+});
+
+test('real releases carry verified dates and sources, with clearly simulated financials',()=>{
+  assert.equal(SEASON_START,'2026-11-06');
+  assert.equal(RELEASE_SNAPSHOT_DATE,'2026-11-07');
+  assert.ok(FILMS.length>=16);
+  assert.equal(new Set(FILMS.map(f=>f.id)).size,FILMS.length);
+  assert.ok(FILMS.every(f=>f.sourceUrl.startsWith('https://') && f.lead && f.supporting.length===2 && f.director));
+  assert.ok(FILMS.every(f=>f.metricsStatus==='simulated'));
+  for(const f of FILMS){
+    const diff=(Date.parse(f.releaseDate+'T00:00:00Z')-Date.parse(SEASON_START+'T00:00:00Z'))/(24*3600*1000);
+    // Midweek theatrical openings count in the following Friday-Sunday box-office weekend.
+    assert.equal(f.week,Math.ceil(diff/7)+1,f.title);
+  }
 });
 
 test('market bids reserve available cash and transfer property after auction closes',()=>{
@@ -75,7 +93,7 @@ test('a full cast can score, save a result, and advance into the next auction',(
   assert.equal(g.history.length,1);
   assert.equal(g.history[0].cards.length,4);
   assert.ok(g.studios[0].cash>=cash);
-  assert.equal(g.history[0].rankings[0].filmId,'eclipse');
+  assert.equal(g.history[0].rankings[0].filmId,'godzilla');
   nextWeek(g);
   assert.equal(g.week,2);assert.equal(g.phase,'bidding');
   assert.ok(g.auctions.some(a=>byTalentId[a.talentId].firstWeek===3));
@@ -92,7 +110,7 @@ test('a lead cannot be cast as supporting, and the same actor cannot occupy two 
 });
 
 test('weekly production budget halves after premiere and reaches zero at five weeks',()=>{
-  const h={talentId:'title-eclipse',ownerId:'you',purchasePrice:10,purchasedWeek:1};
+  const h={talentId:'title-cat',ownerId:'you',purchasePrice:10,purchasedWeek:1};
   approximate(budgetForAsset(h,1),10);
   approximate(budgetForAsset(h,2),5);
   approximate(budgetForAsset(h,3),2.5);

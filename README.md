@@ -4,9 +4,20 @@
 
 ## Current state
 
-This repository contains a **working, mobile-friendly, single-browser demo** against three computer-controlled studios. It is **not** yet a public multiplayer game. It ships with 16 **fictional films**, invented stars, invented budgets, invented Rotten Tomatoes-style scores, and invented box-office results. Nothing is represented as current real-world movie data. All demo progress is saved in the browser's `localStorage` and can be reset from the UI.
+The public preview is a **working mobile-friendly demo featuring 17 real U.S./Canada theatrical releases from November 6 to December 25, 2026** and real credited people, last checked **November 7, 2026**. The site has a linked **Release calendar** showing the dates, featured lead, supporting performers and directors. Each film links to its studio, distributor or other published film listing. This is a selective holiday slate, not a complete rolling industry feed.
 
-No API keys, external services, paid infrastructure, database, or npm dependencies are required for the prototype.
+**Important distinction:** actual weekend domestic grosses, real production budgets, Rotten Tomatoes ratings, theater counts and prior-actor financials are **not** available here. Every financial figure, review score, auction price, marketing result, studio balance and weekend ranking on the site remains **simulated for gameplay**. This is not a source of real box-office figures. Game-designated "lead" and "supporting" categories do not purport to establish official billing or contractual status. Joint directing credits are treated as a single auctionable directing team in the demo.
+
+The demo runs in one browser against three computer-controlled producers and saves progress locally. **Existing fictional-slate saves are left intact**, but the new real-slate demo starts a separate season because talent IDs have changed.
+
+No API keys, external services, paid infrastructure, database or npm dependencies are required for this preview.
+
+### Real-release data
+
+- `src/releases.js` is the **reviewed Nov 7 release slate** with film-specific source URLs and U.S./Canada date and credit details.
+- `src/data.js` converts that slate into game properties, and creates explicitly **simulated** revenue, budget, theater-count and review-score figures for a functional demo.
+- Film release dates and movie credits can change; the date on the catalog is the review date, **not** an automatic last-checked timestamp.
+- `docs/DATA_SOURCES.md` explains validation, licensing and the next steps for actual weekend data and automated updates.
 
 ## Play locally
 
@@ -48,13 +59,14 @@ The eight-week sample cannot reach a 10-week milestone. The 10-week rule is impl
 
 ## Design and copy
 
-The interface uses a restrained, editorial look inspired by weekend movie trade coverage: warm paper, readable type, simple borders, and more direct wording. UI copy follows the principles in [`docs/VOICE_AND_DESIGN.md`](docs/VOICE_AND_DESIGN.md). The game rules and fictional-data disclosures remain unchanged.
+The interface uses a restrained, editorial look inspired by weekend movie trade coverage: warm paper, readable type, simple borders, and more direct wording. UI copy follows the principles in [`docs/VOICE_AND_DESIGN.md`](docs/VOICE_AND_DESIGN.md). The game rules and simulated-financials disclosures remain prominent.
 
 ## Source layout
 
 - `index.html`, `styles.css`, `favicon.svg`: static application shell and visual design.
 - `src/app.js`: mobile/desktop UI, user actions, status, local save/reset.
-- `src/data.js`: **fictional, clearly labeled** fixture releases, participants, actors, and roles.
+- `src/releases.js`: reviewed real movie titles, release dates and credited people with per-film URLs.
+- `src/data.js`: clearly labeled **simulated** financial figures and corresponding draftable assets.
 - `src/engine.js`: independent game engine (bidding, ownership, budgets, casting, scoring, trading, marketing, co-production, league).
 - `tests/engine.test.mjs`: deterministic test cases using the Node built-in test runner.
 - `scripts/serve.mjs`: tiny local static server.
@@ -63,7 +75,7 @@ The interface uses a restrained, editorial look inspired by weekend movie trade 
 
 There are two separate jobs:
 
-**1. Authoritative film data.** Obtain licensed or otherwise authorized feeds for actual domestic *weekend* grosses and theater counts, verified opening dates and credits, production budgets, and critic ratings. Production budgets and cast billing are inconsistently available, so keep an explicit admin review/override flow with provenance, correction history, and publication times. Do **not** silently replace missing figures with fabricated values or scrape restricted sites. Actual movie posters and actor headshots may also require appropriate licenses.
+**1. Authoritative film data.** We now have a reviewed real theatrical slate. Obtain licensed or otherwise authorized feeds for actual domestic *weekend* grosses and theater counts, continuously updated opening dates and credits, production budgets, and critic ratings. Production budgets and cast billing are inconsistently available, so keep an explicit admin review/override flow with provenance, correction history, and publication times. Do **not** silently replace missing figures with fabricated values or scrape restricted sites. Actual movie posters and actor headshots may also require appropriate licenses.
 
 **2. Server-authoritative multiplayer.** Add account creation, private leagues (four to six producers), invite links, persistent finances, auction deadlines and tie rules, sealed/open bids decision, server-enforced weekly lineup locking, negotiated offers and acceptances, a result settlement ledger, historical corrections, notifications, a league commissioner/admin, and protected access to user data. Client-side demo code and `localStorage` are not safe authorities for competitive multiplayer.
 
